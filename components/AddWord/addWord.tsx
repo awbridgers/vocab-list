@@ -27,11 +27,11 @@ import {useAppSelector} from '../../redux/hooks';
 import {getAuth} from 'firebase/auth';
 
 type Props = {
-  albumName : undefined | string;
+  albumID : undefined | string;
   cancel: ()=>void
 };
 
-const AddWord = ({albumName, cancel}: Props) => {
+const AddWord = ({albumID, cancel}: Props) => {
   const [word, setWord] = useState<string>('');
   const [data, setData] = useState<Definition[]>([]);
   const [error, setError] = useState<string>('');
@@ -82,7 +82,7 @@ const AddWord = ({albumName, cancel}: Props) => {
       synonyms: data[def].synonyms,
       antonyms: data[def].antonyms,
       notes,
-      albums: albumName ? [albumName] : []
+      albums: albumID ? [albumID] : []
     };
     const docRef = doc(collection(database, 'Users', user.uid, 'VocabList'));
     try {
@@ -153,27 +153,6 @@ const AddWord = ({albumName, cancel}: Props) => {
           }}
           useNativeAndroidPickerStyle={false}
           pickerProps={{accessibilityLabel: 'definitionPicker'}}
-        />
-        <Text style={styles.label}>Select an Album</Text>
-
-        {/* <Picker
-          onValueChange={(value) => setAlbum(value)}
-          items={[
-            {label: 'None', value: -2},
-            ...albumList.map((x, i) => ({label: x.name, value: i})),
-            {label: 'Create New Album', value: -1},
-          ]}
-          value={album}
-          style={pickerSelectStyles}
-          placeholder={{}}
-          touchableWrapperProps={{testID: 'albumPicker'}}
-        /> */}
-        <InputLine
-          label={'Notes (Optional)'}
-          value={notes}
-          showError={false}
-          error={''}
-          onChange={setNotes}
         />
         <View style={styles.submit}>
           <TouchableOpacity

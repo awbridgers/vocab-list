@@ -1,3 +1,5 @@
+
+
 export type RootStackParamsList = {
   Home: undefined;
   Test: undefined;
@@ -9,7 +11,8 @@ export type RootStackParamsList = {
 };
 export type TabParamList = {
   WordList: undefined;
-  Albums: undefined;
+  Albums : undefined;
+  Quiz : undefined;
 
 }
 export interface Word {

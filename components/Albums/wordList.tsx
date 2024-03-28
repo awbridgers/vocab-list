@@ -7,6 +7,7 @@ import {
   Modal,
   TouchableOpacity,
   BackHandler,
+  Pressable,
 } from 'react-native';
 import CheckBox from 'expo-checkbox';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
@@ -24,6 +25,7 @@ import {
   updateDoc,
   writeBatch,
   onSnapshot,
+  WriteBatch,
 } from 'firebase/firestore';
 import {useSelector} from 'react-redux';
 import {RootState} from '../../redux/store';
@@ -39,35 +41,37 @@ import AddWord from '../AddWord/addWord';
 type Props = {
   data: Word[];
   album?: Album;
+  back?: () => void;
 };
 
-const WordList = ({data, album}: Props) => {
+const WordList = ({data, album, back}: Props) => {
   const [openModal, setOpenModal] = useState<boolean>(false);
   const [newTitle, setNewTitle] = useState<string>('');
   const [edit, setEdit] = useState<boolean>(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState<boolean>(false);
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
-
-  const addWord = (word: Word) => {
-    
-  };
+  const [layoutHeight, setLayoutHeight] = useState<number>(0);
+  const [showNameModal, setShowNameModal] = useState<boolean>(false);
+  const [selectedWord, setSelectedWord] = useState<Word | null>(null);
+  const auth = getAuth();
+  const user = auth.currentUser;
 
   // );
-  // const changeName = () => {
-  //   if(!user) return
-  //   if (newTitle.length > 0) {
-  //     setOpenModal(false);
-  //     const ref = doc(database, 'Users', user.uid, 'Albums', album.id);
-  //     updateDoc(ref, {name: newTitle})
-  //       .then(() => {
-  //         setNewTitle('');
-  //       })
-  //       .catch((e) => Alert.alert('Error', e.message));
-  //   } else {
-  //     Alert.alert('Name cannot be blank.');
-  //   }
-  // };
+  const changeName = () => {
+    if (!user || !album) return;
+    if (newTitle.length > 0) {
+      const ref = doc(database, 'Users', user.uid, 'Albums', album.id);
+      updateDoc(ref, {name: newTitle})
+        .then(() => {
+          setNewTitle('');
+          setShowNameModal(false);
+        })
+        .catch((e) => Alert.alert('Error', e.message));
+    } else {
+      Alert.alert('Name cannot be blank.');
+    }
+  };
   const selectWord = (value: boolean, id: string) => {
     if (value) {
       //box is checked, add to list
@@ -82,74 +86,42 @@ const WordList = ({data, album}: Props) => {
     }
   };
   const deleteWords = () => {
-    // if(!user) return
-    // if (selected.length > 0) {
-    //   const ref = collection(
-    //     database,
-    //     'Users',
-    //     user.uid,
-    //     'Albums',
-    //     id,
-    //     'Words'
-    //   );
-    //   Alert.alert(
-    //     'Delete Words',
-    //     `Are you sure you want to delete ${selected.length} words?`,
-    //     [
-    //       {
-    //         onPress: () => {
-    //           const batch = writeBatch(database);
-    //           selected.forEach((wordID) => batch.delete(doc(ref, wordID)));
-    //           batch
-    //             .commit()
-    //             .then(() => setSelected([]))
-    //             .catch((e) => Alert.alert('Error', e.message));
-    //         },
-    //         text: 'Ok',
-    //         style: 'default',
-    //       },
-    //       {
-    //         onPress: () => console.log('Delete Cancelled'),
-    //         text: 'Cancel',
-    //         style: 'cancel',
-    //       },
-    //     ]
-    //   );
-    // } else {
-    //   Alert.alert(
-    //     'Select a Word first.',
-    //     'You must select one or more words to delete first.'
-    //   );
-    //}
+    if (!user) return;
+    if (selected.size > 0) {
+      const ref = collection(database, 'Users', user.uid, 'VocabList');
+      if (!album) {
+        //if this is the list of all words, ask for confirmation
+        Alert.alert(
+          'Delete Words',
+          `Are you sure you want to delete ${selected.size} words?`,
+          [
+            {
+              onPress: () => {
+                const batch = writeBatch(database);
+                selected.forEach((wordID) => batch.delete(doc(ref, wordID)));
+                batch
+                  .commit()
+                  .then(() => setSelected(new Set()))
+                  .catch((e) => Alert.alert('Error', e.message));
+              },
+              text: 'Ok',
+              style: 'default',
+            },
+            {
+              onPress: () => console.log('Delete Cancelled'),
+              text: 'Cancel',
+              style: 'cancel',
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Select a Word first.',
+          'You must select one or more words to delete first.'
+        );
+      }
+    }
   };
-  // useEffect(() => {
-  //   if (user) {
-  //     const ref = collection(
-  //       database,
-  //       'Users',
-  //       user.uid,
-  //       'Albums',
-  //       `${album.id}`,
-  //       'Words'
-  //     );
-  //     const unsubscribe = onSnapshot(
-  //       ref,
-  //       (data) => {
-  //         const results : Word[] = [];
-  //         data.forEach((def) =>
-  //           results.push({...def.data(), id: def.id} as Word)
-  //         );
-  //         setData(
-  //           results.sort((a, b) =>
-  //             a.word === b.word ? 0 : a.word < b.word ? -1 : 1
-  //           )
-  //         );
-  //       },
-  //       (e) => Alert.alert('Error', e.message)
-  //     );
-  //     return () => unsubscribe();
-  //   }
-  // }, [album, user]);
 
   const handleSelectAll = () => {
     if (!selectAll) {
@@ -160,7 +132,69 @@ const WordList = ({data, album}: Props) => {
       setSelectAll(false);
     }
   };
- 
+
+  const deleteAlbum = () => {
+    if (!album || !user) return;
+    Alert.alert(
+      `Delete ${album.name}`,
+      `Do you want to save the words from ${album.name} or delete them as well?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Keep Words',
+          onPress: () => {
+            //delete album and remove id from each words id
+            const batch = writeBatch(database);
+            for (const word of data) {
+              const docRef = doc(
+                database,
+                'Users',
+                user.uid,
+                'VocabList',
+                word.id
+              );
+              batch.update(docRef, {
+                ...word,
+                albums: word.albums.filter((x) => x !== album.id),
+              });
+            }
+            batch.delete(doc(database, 'Users', user.uid, 'Albums', album.id));
+            batch
+              .commit()
+              .then(() => back!())
+              .catch((e) => console.log(e));
+          },
+        },
+        {
+          text: 'Delete Words',
+          onPress: () => {
+            //delete all words and then album
+            const batch = writeBatch(database);
+            for (const word of data) {
+              const docRef = doc(
+                database,
+                'Users',
+                user.uid,
+                'VocabList',
+                word.id
+              );
+              batch.delete(docRef);
+            }
+            batch.delete(doc(database, 'Users', user.uid, 'Albums', album.id));
+            batch
+              .commit()
+              .then(() => back!())
+              .catch((e) => console.log(e));
+          },
+        },
+      ],
+      {cancelable: true}
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
@@ -174,7 +208,7 @@ const WordList = ({data, album}: Props) => {
               {edit ? (
                 <FontAwesome6 name="check" size={32} testId="editIcon" />
               ) : (
-                <FontAwesome6 name="list-check" size={32} testID="addIcon" />
+                <FontAwesome6 name="edit" size={32} testID="addIcon" />
               )}
             </TouchableOpacity>
           }
@@ -184,14 +218,14 @@ const WordList = ({data, album}: Props) => {
           <Text style={styles.titleText} accessibilityLabel="Title">
             {album ? album.name : 'All'}
           </Text>
-          {/* {edit && (
+          {edit && album && (
             <TouchableOpacity
               accessibilityLabel="edit title"
-              onPress={() => setOpenModal(true)}
+              onPress={() => setShowNameModal(true)}
             >
               <Feather name="edit" size={24} color="black" testID="editIcon" />
             </TouchableOpacity>
-          )} */}
+          )}
         </View>
         <View style={styles.controlButton}>
           {edit ? (
@@ -218,9 +252,15 @@ const WordList = ({data, album}: Props) => {
         </View>
       </View>
 
-      <View style={{width: '95%'}}>
+      <View style={{width: '100%'}}>
         {edit && (
-          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginBottom: 10,
+            }}
+          >
             <CheckBox
               style={styles.checkBox}
               value={selectAll}
@@ -230,8 +270,12 @@ const WordList = ({data, album}: Props) => {
             <Text style={{fontSize: 20}}>Select All</Text>
           </View>
         )}
+      </View>
+      <View style={{flex: 1}}>
         <FlatList
-          contentContainerStyle={{paddingBottom: 200, marginTop: 10}}
+          contentContainerStyle={{paddingBottom: 100, paddingTop: 5}}
+          style={{height: layoutHeight}}
+          onLayout={(e) => setLayoutHeight(e.nativeEvent.layout.height)}
           data={data}
           renderItem={({item}) => (
             <View style={{flexDirection: 'row'}}>
@@ -243,89 +287,156 @@ const WordList = ({data, album}: Props) => {
                   onValueChange={(value) => selectWord(value, item.id)}
                 />
               )}
-              <View style={styles.wordContainer}>
-                <Text style={styles.word} accessibilityLabel="word">
-                  {item.word}
-                </Text>
-                <Text style={styles.pos}>
-                  (
-                  {item.partOfSpeech.length > 5
-                    ? item.partOfSpeech.slice(0, 3)
-                    : item.partOfSpeech}
-                  )-
-                </Text>
-                <Text style={styles.def} accessibilityLabel="definition">
-                  {item.definition}
-                </Text>
-              </View>
+              <Pressable disabled={edit} onPress={() => setSelectedWord(item)}>
+                <View style={styles.wordContainer}>
+                  <Text style={styles.word} accessibilityLabel="word">
+                    {item.word}
+                  </Text>
+                  <Text style={styles.pos}>
+                    (
+                    {item.partOfSpeech.length > 5
+                      ? item.partOfSpeech.slice(0, 3)
+                      : item.partOfSpeech}
+                    )-
+                  </Text>
+                  <Text style={styles.def} accessibilityLabel="definition">
+                    {item.definition}
+                  </Text>
+                </View>
+              </Pressable>
             </View>
           )}
         />
       </View>
-      <Modal visible={showAddModal} animationType="fade" onRequestClose={()=>setShowAddModal(false)}>
-        <AddWord albumName = {album?.id} cancel = {()=>setShowAddModal(false)} />
+      {edit && album && (
+        <View>
+          <TouchableOpacity onPress={deleteAlbum} style={styles.deleteAlbum}>
+            <Text>Delete Album</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      <Modal
+        visible={showAddModal}
+        animationType="fade"
+        onRequestClose={() => setShowAddModal(false)}
+      >
+        <AddWord albumID={album?.id} cancel={() => setShowAddModal(false)} />
       </Modal>
-      {/* <Modal
-        visible={openModal}
+      <Modal
+        visible={!!selectedWord}
+        animationType="fade"
+        onRequestClose={() => setSelectedWord(null)}
+        statusBarTranslucent
         transparent
-        animationType="slide"
-        accessibilityLabel="change title modal"
       >
         <View style={styles.modal}>
-          <View style={styles.modalBody}>
-            <View style={styles.modalTitleContainer}>
-              <Text style={styles.modalTitle}>Change Title of </Text>
-              <Text style={[styles.modalTitle, styles.modalOldTitle]}>
-                {album.name}
-              </Text>
+          <View
+            style={[
+              styles.modalBody,
+              {minHeight: 350, width: '90%', justifyContent: 'space-between'},
+            ]}
+          >
+            <View>
+              <View style={styles.modalTitleContainer}>
+                <Text style={styles.modalTitle}>{selectedWord?.word}</Text>
+              </View>
+              <View>
+                <View style={{margin: 5}}>
+                  <Text style={{fontSize: 20, fontStyle: 'italic'}}>
+                    {selectedWord?.partOfSpeech}
+                  </Text>
+                </View>
+                <View style={{margin: 5}}>
+                  <Text style={{fontSize: 20}}>{selectedWord?.definition}</Text>
+                </View>
+                <View style={{margin: 5}}>
+                  <Text style={{fontSize: 20}}>
+                    Synonyms: {selectedWord?.synonyms.join(', ')}
+                  </Text>
+                </View>
+                <View style={{margin: 5}}>
+                  <Text style={{fontSize: 20}}>
+                    Antonyms: {selectedWord?.antonyms.join(', ')}
+                  </Text>
+                </View>
+              </View>
             </View>
-            <InputLine
-              label={'New Title'}
-              value={newTitle}
-              showError={false}
-              error={''}
-              onChange={setNewTitle}
+            <Button
+              height={50}
+              onPress={() => setSelectedWord(null)}
+              width={115}
+              text={'Done'}
+              bgColor="#59fa14"
+              fontSize={25}
+              margin={5}
             />
-            <View style={styles.modalButtons}>
-              <Button
-                height={50}
-                width={100}
-                onPress={() => setOpenModal(false)}
-                text={'Cancel'}
-                bgColor={'#f94545'}
-                fontSize={20}
-                margin={10}
-              />
-              <Button
-                height={50}
-                width={100}
-                onPress={() =>
-                  Alert.alert(
-                    'Confirm Name Change',
-                    `Change the name of ${album.name} to ${newTitle}?`,
-                    [
-                      {
-                        onPress: () => changeName(),
-                        text: 'Ok',
-                        style: 'default',
-                      },
-                      {
-                        onPress: () => console.log('Name Change Cancelled'),
-                        text: 'Cancel',
-                        style: 'cancel',
-                      },
-                    ]
-                  )
-                }
-                text={'Accept'}
-                bgColor={'#0c8e3d'}
-                fontSize={20}
-                margin={10}
-              />
-            </View>
           </View>
         </View>
-      </Modal> */}
+      </Modal>
+      {album && (
+        <Modal
+          visible={showNameModal}
+          transparent
+          animationType="slide"
+          accessibilityLabel="change title modal"
+          statusBarTranslucent
+        >
+          <View style={styles.modal}>
+            <View style={styles.modalBody}>
+              <View style={styles.modalTitleContainer}>
+                <Text style={styles.modalTitle}>Change Title of </Text>
+                <Text style={[styles.modalTitle, styles.modalOldTitle]}>
+                  {album.name}
+                </Text>
+              </View>
+              <InputLine
+                label={'New Title'}
+                value={newTitle}
+                showError={false}
+                error={''}
+                onChange={setNewTitle}
+              />
+              <View style={styles.modalButtons}>
+                <Button
+                  height={50}
+                  width={100}
+                  onPress={() => setOpenModal(false)}
+                  text={'Cancel'}
+                  bgColor={'#f94545'}
+                  fontSize={20}
+                  margin={10}
+                />
+                <Button
+                  height={50}
+                  width={100}
+                  onPress={() =>
+                    Alert.alert(
+                      'Confirm Name Change',
+                      `Change the name of ${album.name} to ${newTitle}?`,
+                      [
+                        {
+                          onPress: () => changeName(),
+                          text: 'Ok',
+                          style: 'default',
+                        },
+                        {
+                          onPress: () => console.log('Name Change Cancelled'),
+                          text: 'Cancel',
+                          style: 'cancel',
+                        },
+                      ]
+                    )
+                  }
+                  text={'Accept'}
+                  bgColor={'#0c8e3d'}
+                  fontSize={20}
+                  margin={10}
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
       {}
     </View>
   );
@@ -346,7 +457,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     width: '90%',
     margin: 10,
-    marginBottom: 20,
+    marginBottom: 10,
     alignItems: 'flex-start',
   },
   edit: {
@@ -418,9 +529,23 @@ const styles = StyleSheet.create({
   },
   checkBox: {
     margin: 5,
+    padding: 10,
   },
   controlButton: {
     margin: 5,
     marginTop: 8,
+  },
+  deleteAlbum: {
+    backgroundColor: 'red',
+    justifyContent: 'center',
+    height: 50,
+    width: 125,
+    alignItems: 'center',
+    borderRadius: 8,
+    margin: 5,
+  },
+  backButton: {
+    position: 'absolute',
+    left: 0,
   },
 });

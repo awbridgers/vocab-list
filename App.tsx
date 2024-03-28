@@ -81,7 +81,7 @@ export const Nav = () => {
   //listen for word changes
   useEffect(() => {
     if (isLoggedIn) {
-      console.log('user')
+      //console.log('user')
       const ref = collection(db, 'Users', user!.uid, 'VocabList');
       const unsub = onSnapshot(ref, (refSnapshot) => {
         const wordArray: Word[] = [];
@@ -158,7 +158,7 @@ export const Nav = () => {
           <>
             <Stack.Screen name="Home" component={Home}></Stack.Screen>
             <Stack.Screen name="Album" component={AlbumPage}/>
-            <Stack.Screen name="Quiz" component={Quiz} />
+            {/* <Stack.Screen name="Quiz" component={Quiz} /> */}
           </>
         ) : (
           <>

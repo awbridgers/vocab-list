@@ -1,43 +1,102 @@
-import {Alert, Modal, StyleSheet, Text, View} from 'react-native';
+import {
+  Alert,
+  Modal,
+  StyleSheet,
+  Text,
+  Touchable,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import React, {useEffect, useRef, useState} from 'react';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {RootStackParamsList, Word} from '../../types/types';
+import {RootStackParamsList, TabParamList, Word} from '../../types/types';
 import {collection, getDocs} from 'firebase/firestore';
 import {database} from '../../firebaseConfig';
 import {useSelector} from 'react-redux';
 import {RootState} from '../../redux/store';
 import Button from '../Button/Button';
+import {useAppSelector} from '../../redux/hooks';
+import {CompositeScreenProps} from '@react-navigation/native';
+import {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
 
-type iProps = NativeStackScreenProps<RootStackParamsList, 'Quiz'>;
+type Props = CompositeScreenProps<
+  BottomTabScreenProps<TabParamList, 'Quiz'>,
+  NativeStackScreenProps<RootStackParamsList>
+>;
 
-const Quiz = ({navigation, route}: iProps) => {
-  const [wordList, setWordList] = useState<Word[]>([]);
+const Quiz = ({navigation, route}: Props) => {
+  const allWords = useAppSelector((state) => state.words);
+  const [gameStarted, setGameStarted] = useState<boolean>(false);
   const [currentWord, setCurrentWord] = useState<Word>();
   const [answers, setAnswers] = useState<Word[]>([]);
-  const [selection, setSelection] = useState<Word | null>();
   const [clicked, setClicked] = useState<number[]>([]);
   const [score, setScore] = useState<number>(0);
   const [attempts, setAttempts] = useState<number>(0);
-  const [newWord, setNewWord] = useState<boolean>(false);
   const [gameOver, setGameOver] = useState<boolean>(false);
-  const user = useSelector((state: RootState) => state.user);
-  const album = route.params ? route.params.album : null;
-  const index = useRef<number>();
+  const correctIndex = useRef<number>();
   const active = useRef<boolean>(false);
-  const allWords = useRef<Word[]>([]);
+  const guessCount = useRef<number>(0);
+  const wordList = useRef<Word[]>(allWords);
 
   const restart = () => {
-    setNewWord(true);
     setGameOver(false);
-    setScore(0);
-    setAttempts(0);
-    setWordList(allWords.current);
+    wordList.current = allWords;
+    setGameStarted(true);
+    setWord();
+  };
+  const setWord = () => {
+    //pick a random word from the total list
+    const random = Math.floor(Math.random() * wordList.current.length);
+    const chosenWord = {...wordList.current[random]};
+    //select 4 random answers from the total words list
+    const answersArray: Word[] = [];
+    let remainingWords = allWords.filter((x) => x.word !== chosenWord.word);
+    for (let i = 0; i < 4; i++) {
+      const temp = Math.floor(Math.random() * remainingWords.length);
+      const answerWord = {...remainingWords[temp]}
+      answersArray.push(answerWord);
+      remainingWords = remainingWords.filter(x=>x.word !==answerWord.word)
+    }
+    //replace 1 of the words at random with the actual answer
+    const answerIndex = Math.floor(Math.random() * 4);
+    answersArray[answerIndex] = chosenWord;
+    //store the index of the selected word so it can be removed easily later
+    correctIndex.current = random;
+    active.current = true;
+    setCurrentWord(chosenWord);
+    
+    setAnswers(answersArray);
+    
+    guessCount.current = 0;
   };
   const selectWord = (word: Word, index: number) => {
-    //block use of buttons until result is determined
-    active.current = false
-    setSelection(word);
+    if (!currentWord) return;
+    active.current = false;
     setClicked((prev) => [...prev, index]);
+    //if the answer is correct
+    if (word.word === currentWord.word) {
+      wordList.current =
+        guessCount.current === 0
+          ? wordList.current.filter((x, i) => i !== correctIndex.current)
+          : wordList.current;
+      setTimeout(() => {
+        setScore((prev) => (guessCount.current === 0 ? prev + 1 : prev));
+        setAttempts((prev) => (guessCount.current === 0 ? prev + 1 : prev));
+        setClicked([]);
+        if(wordList.current.length) setWord();
+        else setGameOver(true)
+      }, 2000);
+    } else {
+      //wrong answer!
+      guessCount.current += 1;
+      //only count attempts on first wrong guess. Per word, not per guess.
+      setAttempts((prev) => (guessCount.current === 1 ? prev + 1 : prev));
+      active.current = true;
+    }
+  };
+  const startGame = () => {
+    setGameStarted(true);
+    setWord();
   };
   const styleButton = (index: number) => {
     if (clicked.includes(index)) {
@@ -50,148 +109,50 @@ const Quiz = ({navigation, route}: iProps) => {
         return 'red';
       }
     }
-    return 'grey';
+    return '#c0c0c0';
   };
-  useEffect(() => {
-    //fetch the words from the album
-    let mounted = true;
-    const results: Word[] = [];
-    if (user) {
-      const ref = collection(
-        database,
-        'Users',
-        user.uid,
-        'Albums',
-        `${album ? album.id : 'All'}`,
-        'Words'
-      );
-      getDocs(ref)
-        .then((data) => {
-          data.forEach((def) =>
-            results.push({...def.data(), id: def.id} as Word)
-          );
-          if (mounted) {
-            setWordList(results);
-            setNewWord(true);
-            //store a copy for wrong answers
-            allWords.current = results;
-          }
-        })
-        .catch((e) => Alert.alert('Error', e.message));
-    }else{
-      navigation.navigate('Home')
-    }
-    return () => {
-      mounted = false;
-    };
-  }, [album, user, navigation]);
-  useEffect(() => {
-    const setWord = () => {
-      //pick a random word from the total list
-      const random = Math.floor(Math.random() * wordList.length);
-      const chosenWord = {...wordList[random]};
-      //select 3 random answers from the total words list
-      const answersArray: Word[] = [];
-      const remainingWords = allWords.current.filter(
-        (x) => x.word !== chosenWord.word
-      );
-      for (let i = 0; i < 4; i++) {
-        const temp = Math.floor(Math.random() * remainingWords.length);
-        answersArray.push({...remainingWords[temp]});
-      }
-      //replace 1 of the words at random with the actual answer
-      const answerIndex = Math.floor(Math.random() * 4);
-      answersArray[answerIndex] = chosenWord;
-      //store the index of the selected word so it can be removed easily later
-      index.current = random;
-      setCurrentWord(wordList[random]);
-      setAnswers(answersArray);
-      setNewWord(false);
-      active.current = true;
-    };
-    if(!gameOver){
-      if (newWord) {
-        if(wordList.length > 0 || allWords.current.length === 0){
-          //fetch a new word if there are no words (i.e) init render
-          //or if there are still words in the list
-          setWord();
-        }
-        else{
-          //if wordList is 0 and allWord is not,
-          //all words have been answered correctly
-          setGameOver(true)
-        }
-      }
-    }
-    
-  }, [newWord, wordList, gameOver]);
-  useEffect(() => {
-    //check for a correct answer
-    if (selection && currentWord) {
-      if (selection.word === currentWord.word) {
-        //the answer is correct!
-        if (clicked.length === 1) {
-          //right on the first guess
-         
-          const newWordList = wordList.filter((x, i) => i !== index.current);
-          setTimeout(() => {
-            setScore((prev) => prev + 1);
-            setAttempts((prev) => prev + 1);
-            setNewWord(true);
-            setSelection(null);
-            setWordList(newWordList);
-            setClicked([]);
-          }, 2000);
-        } else {
-          setTimeout(() => {
-            setNewWord(true);
-            setSelection(null);
-            setClicked([]);
-          }, 2000);
-        }
-      } else {
-        //re-activate buttons
-        active.current = true;
-        //the answer is wrong!
-        if (clicked.length === 1) {
-          setAttempts((prev) => prev + 1);
-        }
-      }
-    }
-  }, [selection, currentWord, wordList, clicked]);
+  if(allWords.length < 5){
+    return <View style = {[styles.container, {justifyContent: 'center', alignItems: 'center'}]}>
+      <Text style = {{fontSize: 30, textAlign: 'center'}}>Add more words to start the quiz.</Text>
+    </View>
+  }
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>
-        Score: {score}/{attempts}
-      </Text>
+      <View>
+        <Text style={styles.title}>
+          Score: {score}/{attempts}
+        </Text>
+      </View>
       <View style={styles.quizArea}>
-        <View style={styles.definitionContainer}>
-          <Text style={styles.definition}>{currentWord?.definition}</Text>
-        </View>
+        {!gameStarted ? (
+          <View>
+            <TouchableOpacity style={styles.button} onPress={startGame}>
+              <Text style={{fontSize: 30}}>Start</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View>
+            <View style={styles.definitionContainer}>
+              <Text style={styles.definition}>{currentWord?.definition}</Text>
+            </View>
+            <View style={styles.answers}>
+              {answers.map((word, i) => (
+                <TouchableOpacity
+                  style={[styles.wordChoice, {backgroundColor: styleButton(i)}]}
+                  key={i}
+                  onPress={() => selectWord(word, i)}
+                  disabled={clicked.includes(i) || !active.current}
+                >
+                  <Text style={{fontSize: 25}}>{word.word}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
       </View>
-      <View style={styles.answers}>
-        {answers.map((word, i) => (
-          <Button
-            key={i}
-            margin={5}
-            height={50}
-            width={300}
-            onPress={() => {
-              if (active.current) {
-                selectWord(word, i);
-                
-              }
-            }}
-            text={word.word}
-            bgColor={styleButton(i)}
-            fontSize={25}
-          />
-        ))}
-      </View>
-
       <Modal
         accessibilityLabel="menu modal"
-        visible={gameOver}
+        visible={gameStarted && gameOver}
         animationType="slide"
         transparent={true}
       >
@@ -208,19 +169,6 @@ const Quiz = ({navigation, route}: iProps) => {
               onPress={() => restart()}
               text={'Play Again'}
               bgColor={'yellow'}
-              fontSize={20}
-              margin={5}
-            />
-            <Button
-              height={75}
-              width={200}
-              onPress={
-                album
-                  ? () => navigation.navigate('Albums')
-                  : () => navigation.navigate('Home')
-              }
-              text={'Quit'}
-              bgColor={'green'}
               fontSize={20}
               margin={5}
             />
@@ -245,11 +193,13 @@ const styles = StyleSheet.create({
   },
   quizArea: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   definitionContainer: {
     flexGrow: 1,
+    margin: 5,
     justifyContent: 'center',
-    backgroundColor: '#dcdcdc',
     alignContent: 'center',
   },
   definition: {
@@ -257,6 +207,7 @@ const styles = StyleSheet.create({
   },
   answers: {
     alignItems: 'center',
+    paddingBottom: 10,
   },
   modal: {
     justifyContent: 'center',
@@ -278,5 +229,20 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 20,
+  },
+  button: {
+    height: 75,
+    width: 150,
+    backgroundColor: 'green',
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 10,
+  },
+  wordChoice: {
+    margin: 5,
+    height: 50,
+    width: 300,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

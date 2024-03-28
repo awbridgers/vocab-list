@@ -30,7 +30,7 @@ import {Feather} from '@expo/vector-icons';
 
 type AlbumProps = CompositeScreenProps<
   BottomTabScreenProps<TabParamList, 'Albums'>,
-  NativeStackScreenProps<RootStackParamsList, 'Home'>
+  NativeStackScreenProps<RootStackParamsList>
 >;
 
 const Albums = ({navigation}: AlbumProps) => {
@@ -119,7 +119,7 @@ const Albums = ({navigation}: AlbumProps) => {
         showsVerticalScrollIndicator={false}
         renderItem={({item, index}) => (
           <Pressable
-            onPress={() => navigation.navigate('Album', {album: item.id})}
+            onPress={() => navigation.navigate('Album', {album: item.id} as never)}
             style={styles.card}
             key={item.id}
           >
