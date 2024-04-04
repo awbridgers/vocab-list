@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   BackHandler,
   Pressable,
+  useWindowDimensions,
 } from 'react-native';
 import CheckBox from 'expo-checkbox';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
@@ -34,9 +35,15 @@ import InputLine from '../InputLine/InputLine';
 import {Feather, FontAwesome6} from '@expo/vector-icons';
 import {getAuth} from 'firebase/auth';
 import {useAppSelector} from '../../redux/hooks';
-import {CompositeScreenProps, useFocusEffect} from '@react-navigation/native';
+import {
+  CompositeScreenProps,
+  useFocusEffect,
+  useTheme,
+} from '@react-navigation/native';
 import {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
 import AddWord from '../AddWord/addWord';
+import {Appearance} from 'react-native';
+import AppText from '../AppText/AppText';
 
 type Props = {
   data: Word[];
@@ -48,7 +55,7 @@ const WordList = ({data, album, back}: Props) => {
   const [openModal, setOpenModal] = useState<boolean>(false);
   const [newTitle, setNewTitle] = useState<string>('');
   const [edit, setEdit] = useState<boolean>(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Map<string, Word>>(new Map());
   const [selectAll, setSelectAll] = useState<boolean>(false);
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [layoutHeight, setLayoutHeight] = useState<number>(0);
@@ -56,6 +63,8 @@ const WordList = ({data, album, back}: Props) => {
   const [selectedWord, setSelectedWord] = useState<Word | null>(null);
   const auth = getAuth();
   const user = auth.currentUser;
+  const scheme = Appearance.getColorScheme();
+  const {width} = useWindowDimensions();
 
   // );
   const changeName = () => {
@@ -72,16 +81,16 @@ const WordList = ({data, album, back}: Props) => {
       Alert.alert('Name cannot be blank.');
     }
   };
-  const selectWord = (value: boolean, id: string) => {
+  const selectWord = (value: boolean, word: Word) => {
     if (value) {
       //box is checked, add to list
-      setSelected((prev) => new Set(prev).add(id));
+      setSelected((prev) => new Map(prev).set(word.id, word));
     } else {
       //box is unchecked, remove from list
       setSelected((prev) => {
-        const updatedSet = new Set(prev);
-        updatedSet.delete(id);
-        return updatedSet;
+        const updatedMap = new Map(prev);
+        updatedMap.delete(word.id);
+        return updatedMap;
       });
     }
   };
@@ -98,10 +107,10 @@ const WordList = ({data, album, back}: Props) => {
             {
               onPress: () => {
                 const batch = writeBatch(database);
-                selected.forEach((wordID) => batch.delete(doc(ref, wordID)));
+                selected.forEach((word, key) => batch.delete(doc(ref, key)));
                 batch
                   .commit()
-                  .then(() => setSelected(new Set()))
+                  .then(() => setSelected(new Map()))
                   .catch((e) => Alert.alert('Error', e.message));
               },
               text: 'Ok',
@@ -116,19 +125,73 @@ const WordList = ({data, album, back}: Props) => {
         );
       } else {
         Alert.alert(
-          'Select a Word first.',
-          'You must select one or more words to delete first.'
+          'Delete from this album or whole library?',
+          `Do you want to keep the ${selected.size} word${
+            selected.size > 1 ? 's' : ''
+          } in the library or delete them entirely?`,
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+            {
+              text: 'Keep',
+              onPress: () => {
+                //remove this album id from each words album list
+                const batch = writeBatch(database);
+                for (const [key, word] of [...selected]) {
+                  const docRef = doc(
+                    database,
+                    'Users',
+                    user.uid,
+                    'VocabList',
+                    key
+                  );
+                  batch.update(docRef, {
+                    ...word,
+                    albums: word.albums.filter((x) => x !== album.id),
+                  });
+                }
+
+                batch.commit().catch((e) => console.log(e));
+              },
+            },
+            {
+              text: 'Delete',
+              onPress: () => {
+                //delete all words and then album
+                const batch = writeBatch(database);
+                for (const [key, word] of selected) {
+                  const docRef = doc(
+                    database,
+                    'Users',
+                    user.uid,
+                    'VocabList',
+                    key
+                  );
+                  batch.delete(docRef);
+                }
+                batch.commit().catch((e) => console.log(e));
+              },
+            },
+          ],
+          {cancelable: true}
         );
       }
+    } else {
+      Alert.alert(
+        'Select a Word first.',
+        'You must select one or more words to delete first.'
+      );
     }
   };
 
   const handleSelectAll = () => {
     if (!selectAll) {
-      setSelected(new Set(data.map((x) => x.id)));
+      setSelected(new Map(data.map((x) => [x.id, x])));
       setSelectAll(true);
     } else {
-      setSelected(new Set());
+      setSelected(new Map());
       setSelectAll(false);
     }
   };
@@ -206,24 +269,39 @@ const WordList = ({data, album, back}: Props) => {
               accessibilityLabel="delete word"
             >
               {edit ? (
-                <FontAwesome6 name="check" size={32} testId="editIcon" />
+                <FontAwesome6
+                  name="check"
+                  color={scheme === 'dark' ? 'white' : 'black'}
+                  size={32}
+                  testId="editIcon"
+                />
               ) : (
-                <FontAwesome6 name="edit" size={32} testID="addIcon" />
+                <FontAwesome6
+                  name="edit"
+                  color={scheme === 'dark' ? 'white' : 'black'}
+                  size={32}
+                  testID="addIcon"
+                />
               )}
             </TouchableOpacity>
           }
         </View>
 
         <View style={styles.title}>
-          <Text style={styles.titleText} accessibilityLabel="Title">
+          <AppText style={styles.titleText} accessibilityLabel="Title">
             {album ? album.name : 'All'}
-          </Text>
+          </AppText>
           {edit && album && (
             <TouchableOpacity
               accessibilityLabel="edit title"
               onPress={() => setShowNameModal(true)}
             >
-              <Feather name="edit" size={24} color="black" testID="editIcon" />
+              <Feather
+                name="edit"
+                size={24}
+                color={scheme === 'dark' ? 'white' : 'black'}
+                testID="editIcon"
+              />
             </TouchableOpacity>
           )}
         </View>
@@ -246,7 +324,12 @@ const WordList = ({data, album, back}: Props) => {
               accessibilityLabel="delete word"
               style={{marginLeft: 10}}
             >
-              <Feather name="plus-square" size={32} testID="addIcon" />
+              <Feather
+                name="plus-square"
+                color={scheme === 'dark' ? 'white' : 'black'}
+                size={32}
+                testID="addIcon"
+              />
             </TouchableOpacity>
           )}
         </View>
@@ -267,42 +350,43 @@ const WordList = ({data, album, back}: Props) => {
               onValueChange={handleSelectAll}
               accessibilityLabel="select all"
             />
-            <Text style={{fontSize: 20}}>Select All</Text>
+            <AppText style={{fontSize: 20}}>Select All</AppText>
           </View>
         )}
       </View>
       <View style={{flex: 1}}>
         <FlatList
           contentContainerStyle={{paddingBottom: 100, paddingTop: 5}}
-          style={{height: layoutHeight}}
+          ItemSeparatorComponent={() => <View style={{margin:2}}></View>}
+          style={{height: layoutHeight, width: width}}
           onLayout={(e) => setLayoutHeight(e.nativeEvent.layout.height)}
           data={data}
           renderItem={({item}) => (
-            <View style={{flexDirection: 'row'}}>
+            <View style={{flexDirection: 'row', flex:1}}>
               {edit && (
                 <CheckBox
                   accessibilityLabel="check box"
                   style={styles.checkBox}
                   value={selected.has(item.id)}
-                  onValueChange={(value) => selectWord(value, item.id)}
+                  onValueChange={(value) => selectWord(value, item)}
                 />
               )}
               <Pressable disabled={edit} onPress={() => setSelectedWord(item)}>
-                <View style={styles.wordContainer}>
-                  <Text style={styles.word} accessibilityLabel="word">
-                    {item.word}
-                  </Text>
-                  <Text style={styles.pos}>
-                    (
-                    {item.partOfSpeech.length > 5
-                      ? item.partOfSpeech.slice(0, 3)
-                      : item.partOfSpeech}
-                    )-
-                  </Text>
-                  <Text style={styles.def} accessibilityLabel="definition">
+                <View style = {styles.wordContainer}>
+                  <AppText style={styles.word} accessibilityLabel="word">
+                    {item.word}{' '}
+                    <AppText style={styles.pos}>
+                      (
+                      {item.partOfSpeech.length > 5
+                        ? item.partOfSpeech.slice(0, 3)
+                        : item.partOfSpeech}
+                      )
+                    </AppText>
+                  </AppText>
+                  <AppText style={styles.def} accessibilityLabel="definition">
                     {item.definition}
-                  </Text>
-                </View>
+                  </AppText>
+                  </View>
               </Pressable>
             </View>
           )}
@@ -311,7 +395,7 @@ const WordList = ({data, album, back}: Props) => {
       {edit && album && (
         <View>
           <TouchableOpacity onPress={deleteAlbum} style={styles.deleteAlbum}>
-            <Text>Delete Album</Text>
+            <AppText>Delete Album</AppText>
           </TouchableOpacity>
         </View>
       )}
@@ -334,30 +418,37 @@ const WordList = ({data, album, back}: Props) => {
             style={[
               styles.modalBody,
               {minHeight: 350, width: '90%', justifyContent: 'space-between'},
+              {backgroundColor: scheme === 'dark' ? '#0d0d0d' : 'white'},
             ]}
           >
             <View>
               <View style={styles.modalTitleContainer}>
-                <Text style={styles.modalTitle}>{selectedWord?.word}</Text>
+                <AppText style={styles.modalTitle}>
+                  {selectedWord?.word}
+                </AppText>
               </View>
               <View>
                 <View style={{margin: 5}}>
-                  <Text style={{fontSize: 20, fontStyle: 'italic'}}>
+                  <AppText style={{fontSize: 20, fontStyle: 'italic'}}>
                     {selectedWord?.partOfSpeech}
-                  </Text>
+                  </AppText>
                 </View>
                 <View style={{margin: 5}}>
-                  <Text style={{fontSize: 20}}>{selectedWord?.definition}</Text>
+                  <AppText style={{fontSize: 20}}>
+                    {selectedWord?.definition}
+                  </AppText>
                 </View>
                 <View style={{margin: 5}}>
-                  <Text style={{fontSize: 20}}>
-                    Synonyms: {selectedWord?.synonyms.join(', ')}
-                  </Text>
+                  <AppText style={{fontSize: 20}}>
+                    Synonyms:{' '}
+                    {`${selectedWord ? selectedWord.synonyms.join(', ') : ''}`}
+                  </AppText>
                 </View>
                 <View style={{margin: 5}}>
-                  <Text style={{fontSize: 20}}>
-                    Antonyms: {selectedWord?.antonyms.join(', ')}
-                  </Text>
+                  <AppText style={{fontSize: 20}}>
+                    Antonyms:{' '}
+                    {`${selectedWord ? selectedWord.antonyms.join(', ') : ''}`}
+                  </AppText>
                 </View>
               </View>
             </View>
@@ -380,27 +471,43 @@ const WordList = ({data, album, back}: Props) => {
           animationType="slide"
           accessibilityLabel="change title modal"
           statusBarTranslucent
+          onRequestClose={() => setShowNameModal(false)}
         >
-          <View style={styles.modal}>
-            <View style={styles.modalBody}>
+          <View
+            style={[
+              styles.modal,
+              {
+                backgroundColor:
+                  scheme === 'dark'
+                    ? ' rgba(149, 148, 148, 0.6)'
+                    : 'rgba(85, 81, 81, 0.6)',
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.modalBody,
+                {backgroundColor: scheme === 'dark' ? '#222222' : '#efeeee'},
+              ]}
+            >
               <View style={styles.modalTitleContainer}>
-                <Text style={styles.modalTitle}>Change Title of </Text>
-                <Text style={[styles.modalTitle, styles.modalOldTitle]}>
+                <AppText style={styles.modalTitle}>Change Title of </AppText>
+                <AppText style={[styles.modalTitle, styles.modalOldTitle]}>
                   {album.name}
-                </Text>
+                </AppText>
               </View>
               <InputLine
                 label={'New Title'}
                 value={newTitle}
                 showError={false}
                 error={''}
-                onChange={setNewTitle}
+                onChangeText={(text) => setNewTitle(text)}
               />
               <View style={styles.modalButtons}>
                 <Button
                   height={50}
                   width={100}
-                  onPress={() => setOpenModal(false)}
+                  onPress={() => setShowNameModal(false)}
                   text={'Cancel'}
                   bgColor={'#f94545'}
                   fontSize={20}
@@ -428,7 +535,7 @@ const WordList = ({data, album, back}: Props) => {
                     )
                   }
                   text={'Accept'}
-                  bgColor={'#0c8e3d'}
+                  bgColor={'#59fa14'}
                   fontSize={20}
                   margin={10}
                 />
@@ -449,8 +556,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     margin: 0,
-    borderWidth: 1,
-    borderColor: 'grey',
   },
   titleContainer: {
     flexDirection: 'row',
@@ -484,8 +589,7 @@ const styles = StyleSheet.create({
     marginRight: 5,
   },
   wordContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    marginLeft: 2,
   },
   word: {
     fontWeight: 'bold',
@@ -493,9 +597,11 @@ const styles = StyleSheet.create({
   },
   pos: {
     fontSize: 20,
+    fontWeight: 'normal'
   },
   def: {
     fontSize: 20,
+    marginLeft: 20
   },
   modal: {
     flex: 1,
@@ -536,7 +642,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   deleteAlbum: {
-    backgroundColor: 'red',
+    backgroundColor: '#f94545',
     justifyContent: 'center',
     height: 50,
     width: 125,

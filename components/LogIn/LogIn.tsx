@@ -8,10 +8,12 @@ import {getAuth, signInWithEmailAndPassword} from 'firebase/auth';
 import {changeUser} from '../../redux/userSlice';
 import {useDispatch, useSelector} from 'react-redux';
 import {RootState} from '../../redux/store';
+import {useTheme} from '@react-navigation/native';
+import AppText from '../AppText/AppText';
 
 type Props = NativeStackScreenProps<RootStackParamsList, 'LogIn'>;
-
 const LogIn = ({navigation}: Props) => {
+  const {colors} = useTheme();
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string>('');
@@ -23,17 +25,18 @@ const LogIn = ({navigation}: Props) => {
     );
   };
   return (
-    <View style={style.container}>
-      <View style = {{flex:1, justifyContent: 'center'}}>
-        <Text style={style.title}>Sign In</Text>
-      </View>
+    <View style={[style.container, {backgroundColor: colors.background}]}>
+      
       <View style={style.form}>
+      <View style = {style.titleContainer}>
+        <AppText style={style.title}>Login</AppText>
+      </View>
         <Input
           value={email}
           label={'Email'}
           showError={false}
           error={''}
-          onChange={setEmail}
+          onChangeText={(text)=>setEmail(text)}
           textContentType="emailAddress"
         />
         <Input
@@ -41,7 +44,7 @@ const LogIn = ({navigation}: Props) => {
           label={'Password'}
           showError={error !== ''}
           error={'Invalid Email or Password'}
-          onChange={setPassword}
+          onChangeText={(text)=>setPassword(text)}
           textContentType="password"
           secureTextEntry
         />
@@ -50,19 +53,16 @@ const LogIn = ({navigation}: Props) => {
           width={200}
           onPress={submit}
           text={'Log In'}
-          bgColor="#70da37"
-          fontSize={20}
+          bgColor={'#59fa14'}
+          fontSize={35}
+          margin={10}
         />
+        <View>
+        <AppText style={{fontSize: 22, margin: 5}}>
+          Don't have an account?{' '}
+          <Text style={{color: '#005CA9'}} onPress={()=>navigation.navigate('Create')}>Sign Up!</Text>
+        </AppText>
       </View>
-      <View style = {style.create}>
-      <Button
-          height={75}
-          width={200}
-          onPress={()=>navigation.navigate('Create')}
-          text={'Create Account'}
-          bgColor="yellow"
-          fontSize={20}
-        />
       </View>
       
     </View>
@@ -72,25 +72,24 @@ const LogIn = ({navigation}: Props) => {
 const style = StyleSheet.create({
   container: {
     flex: 1,
-    flexDirection: 'column',
     alignItems: 'center',
   },
+  titleContainer:{
+    padding: 100
+  },
   title: {
-    fontSize: 25,
+    fontSize: 40,
     fontWeight: 'bold',
-    color: 'black',
     textAlign: 'center',
-    margin: 0,
   },
   form: {
     width: '85%',
     alignItems: 'center',
-    justifyContent: 'center',
-    flex: 2
+
   },
-  create:{
-    flex: 2
-  }
+  create: {
+    flexDirection: 'row',
+  },
 });
 
 export default LogIn;

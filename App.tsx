@@ -1,40 +1,49 @@
 import {
   NavigationContainer,
-  DarkTheme,
   DefaultTheme,
   useNavigationContainerRef,
+  DarkTheme,
 } from '@react-navigation/native';
-import {View, Text, TouchableOpacity, Alert} from 'react-native';
+import {Text, TouchableOpacity, Alert, Appearance, useColorScheme} from 'react-native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import Home from './components/Home/Home';
-import * as SplashScreen from 'expo-splash-screen';
 import Create from './components/Create/Create';
 import LogIn from './components/LogIn/LogIn';
 import {Album, RootStackParamsList, Word} from './types/types';
 import {RootState, store} from './redux/store';
-import {Provider, useDispatch, useSelector} from 'react-redux';
-import React, {useCallback, useEffect, useState} from 'react';
+import {Provider, useSelector} from 'react-redux';
+import React, {useEffect, useState} from 'react';
 import {
-  QuerySnapshot,
   collection,
-  getDocs,
   getFirestore,
   onSnapshot,
-  query,
 } from 'firebase/firestore';
-import {database} from './firebaseConfig';
-import AddWord from './components/AddWord/addWord';
 import {getAuth, onAuthStateChanged, signOut} from 'firebase/auth';
-import {changeUser} from './redux/userSlice';
-import Albums from './components/Albums/albums';
-import Quiz from './components/Quiz/quiz';
 import {updateAlbums} from './redux/albumSlice';
-import {useAppDispatch, useAppSelector} from './redux/hooks';
+import {useAppDispatch} from './redux/hooks';
 import { updateWords } from './redux/wordsSlice';
-import WordList from './components/Albums/wordList';
 import AlbumPage from './components/Albums/albumPage';
+import { StatusBar } from 'expo-status-bar';
 
 const Stack = createNativeStackNavigator<RootStackParamsList>();
+
+const lightTheme = {...DefaultTheme,colors:{
+  ...DefaultTheme.colors,
+  primary: '#FAFF0C',
+  card:'#00235D',
+  text: '#f1f1f1',
+  border: '#000000',
+}, dark: false}
+const darkTheme = {
+  ...DarkTheme, colors:{
+    ...DarkTheme.colors,
+    primary: "#FAFF0C",
+    background: '#000000',
+    card: '#00235D',
+    text: '#f1f1f1',
+  },
+  dark: true
+}
 
 export const Nav = () => {
   const dispatch = useAppDispatch();
@@ -46,6 +55,7 @@ export const Nav = () => {
   const db = getFirestore();
   const user = auth.currentUser;
   const navigationRef = useNavigationContainerRef();
+  const scheme = useColorScheme();
   //listen for auth changes
   useEffect(() => {
     const unlisten = onAuthStateChanged(auth, (userInfo) => {
@@ -129,7 +139,8 @@ export const Nav = () => {
     return null;
   }
   return (
-    <NavigationContainer theme={DefaultTheme}>
+    <NavigationContainer theme={scheme === 'dark' ? darkTheme : lightTheme}>
+      <StatusBar style = 'light'/>
       <Stack.Navigator
         screenOptions={
           isLoggedIn
@@ -142,7 +153,7 @@ export const Nav = () => {
                     <Text
                       style={{
                         fontSize: 18,
-                        color: '#007575',
+                        color: '#FAFF0C',
                         fontWeight: 'bold',
                       }}
                     >

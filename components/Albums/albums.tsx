@@ -9,6 +9,7 @@ import {
   Pressable,
   Modal,
   TextInput,
+  useColorScheme,
 } from 'react-native';
 import React, {useState} from 'react';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
@@ -21,12 +22,13 @@ import {
 import {useSelector} from 'react-redux';
 import {RootState} from '../../redux/store';
 import Button from '../Button/Button';
-import {addDoc, collection, deleteDoc, doc} from 'firebase/firestore';
-import {database} from '../../firebaseConfig';
+import {addDoc, collection, deleteDoc, doc, getFirestore} from 'firebase/firestore';
 import {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
 import {getAuth} from 'firebase/auth';
 import {useAppSelector} from '../../redux/hooks';
 import {Feather} from '@expo/vector-icons';
+import AppText from '../AppText/AppText';
+import InputLine from '../InputLine/InputLine';
 
 type AlbumProps = CompositeScreenProps<
   BottomTabScreenProps<TabParamList, 'Albums'>,
@@ -39,6 +41,8 @@ const Albums = ({navigation}: AlbumProps) => {
   const user = auth.currentUser;
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [newTitle, setNewTitle] = useState<string>('');
+  const database = getFirestore();
+  const scheme = useColorScheme();
   const deleteAlbum = (album: AlbumType) => {
     if (!user) return;
     const {id, name} = album;
@@ -81,7 +85,7 @@ const Albums = ({navigation}: AlbumProps) => {
   return (
     <View style={styles.container}>
       <View style={{margin: 10}}>
-        <Text style={styles.header}>Vocab Lists</Text>
+        <AppText style={styles.header}>Groups</AppText>
       </View>
       <Modal
         visible={showAddModal}
@@ -89,14 +93,21 @@ const Albums = ({navigation}: AlbumProps) => {
         transparent={true}
         onRequestClose={resetModal}
       >
-        <View style={[styles.container, {backgroundColor: 'rgba(0,0,0,0.6)'}]}>
-          <View style={styles.modal}>
+        <View style={[styles.container, {
+                backgroundColor:
+                  scheme === 'dark'
+                    ? ' rgba(149, 148, 148, 0.6)'
+                    : 'rgba(85, 81, 81, 0.6)',
+              },]}>
+          <View style={[styles.modal, {backgroundColor: scheme === 'dark' ? '#222222' : '#efeeee'}]}>
             <View>
-              <Text style={{fontSize: 25}}>Add Album</Text>
+              <AppText style={{fontSize: 25}}>Add Group</AppText>
             </View>
-            <TextInput
+            <InputLine
+              label=''
+              error=''
+              showError= {false}
               value={newTitle}
-              style={styles.input}
               onChangeText={(text)=>changeTitle(text)}
               placeholder="Enter Title Here"
             />
@@ -134,7 +145,7 @@ const Albums = ({navigation}: AlbumProps) => {
           onPress={() => setShowAddModal(true)}
           style={styles.add}
         >
-          <Feather name="plus-square" size={50} />
+          <Feather name="plus-square" size={50} color = {scheme === 'dark' ? 'white' : 'black'} />
         </TouchableOpacity>
       </View>
     </View>
@@ -150,8 +161,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    fontSize: 25,
+    fontSize: 35,
     fontWeight: 'bold',
+    padding: 20
   },
   card: {
     backgroundColor: '#dad0d0',

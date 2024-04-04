@@ -1,23 +1,19 @@
 import {
-  Alert,
   Modal,
   StyleSheet,
   Text,
-  Touchable,
   TouchableOpacity,
   View,
+  useColorScheme,
 } from 'react-native';
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useRef, useState} from 'react';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamsList, TabParamList, Word} from '../../types/types';
-import {collection, getDocs} from 'firebase/firestore';
-import {database} from '../../firebaseConfig';
-import {useSelector} from 'react-redux';
-import {RootState} from '../../redux/store';
 import Button from '../Button/Button';
 import {useAppSelector} from '../../redux/hooks';
 import {CompositeScreenProps} from '@react-navigation/native';
 import {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
+import AppText from '../AppText/AppText';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<TabParamList, 'Quiz'>,
@@ -37,7 +33,7 @@ const Quiz = ({navigation, route}: Props) => {
   const active = useRef<boolean>(false);
   const guessCount = useRef<number>(0);
   const wordList = useRef<Word[]>(allWords);
-
+  const scheme = useColorScheme();
   const restart = () => {
     setGameOver(false);
     wordList.current = allWords;
@@ -53,9 +49,9 @@ const Quiz = ({navigation, route}: Props) => {
     let remainingWords = allWords.filter((x) => x.word !== chosenWord.word);
     for (let i = 0; i < 4; i++) {
       const temp = Math.floor(Math.random() * remainingWords.length);
-      const answerWord = {...remainingWords[temp]}
+      const answerWord = {...remainingWords[temp]};
       answersArray.push(answerWord);
-      remainingWords = remainingWords.filter(x=>x.word !==answerWord.word)
+      remainingWords = remainingWords.filter((x) => x.word !== answerWord.word);
     }
     //replace 1 of the words at random with the actual answer
     const answerIndex = Math.floor(Math.random() * 4);
@@ -64,9 +60,9 @@ const Quiz = ({navigation, route}: Props) => {
     correctIndex.current = random;
     active.current = true;
     setCurrentWord(chosenWord);
-    
+
     setAnswers(answersArray);
-    
+
     guessCount.current = 0;
   };
   const selectWord = (word: Word, index: number) => {
@@ -83,8 +79,8 @@ const Quiz = ({navigation, route}: Props) => {
         setScore((prev) => (guessCount.current === 0 ? prev + 1 : prev));
         setAttempts((prev) => (guessCount.current === 0 ? prev + 1 : prev));
         setClicked([]);
-        if(wordList.current.length) setWord();
-        else setGameOver(true)
+        if (wordList.current.length) setWord();
+        else setGameOver(true);
       }, 2000);
     } else {
       //wrong answer!
@@ -103,7 +99,7 @@ const Quiz = ({navigation, route}: Props) => {
       //this button has been clicked
       if (currentWord && answers[index].word === currentWord.word) {
         //this is the correct answer
-        return 'green';
+        return '#59fa14';
       } else {
         //this is the wrong answer
         return 'red';
@@ -111,17 +107,26 @@ const Quiz = ({navigation, route}: Props) => {
     }
     return '#c0c0c0';
   };
-  if(allWords.length < 5){
-    return <View style = {[styles.container, {justifyContent: 'center', alignItems: 'center'}]}>
-      <Text style = {{fontSize: 30, textAlign: 'center'}}>Add more words to start the quiz.</Text>
-    </View>
+  if (allWords.length < 5) {
+    return (
+      <View
+        style={[
+          styles.container,
+          {justifyContent: 'center', alignItems: 'center'},
+        ]}
+      >
+        <AppText style={{fontSize: 30, textAlign: 'center'}}>
+          Add more words to start the quiz.
+        </AppText>
+      </View>
+    );
   }
   return (
     <View style={styles.container}>
       <View>
-        <Text style={styles.title}>
+        <AppText style={styles.title}>
           Score: {score}/{attempts}
-        </Text>
+        </AppText>
       </View>
       <View style={styles.quizArea}>
         {!gameStarted ? (
@@ -133,7 +138,9 @@ const Quiz = ({navigation, route}: Props) => {
         ) : (
           <View>
             <View style={styles.definitionContainer}>
-              <Text style={styles.definition}>{currentWord?.definition}</Text>
+              <AppText style={styles.definition}>
+                {currentWord?.definition}
+              </AppText>
             </View>
             <View style={styles.answers}>
               {answers.map((word, i) => (
@@ -156,19 +163,27 @@ const Quiz = ({navigation, route}: Props) => {
         animationType="slide"
         transparent={true}
       >
-        <View style={styles.modalParent}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Game Over</Text>
-            <Text style={styles.modalScore}>
+        <View style={[
+              styles.modalParent,
+              {
+                backgroundColor:
+                  scheme === 'dark'
+                    ? ' rgba(149, 148, 148, 0.6)'
+                    : 'rgba(85, 81, 81, 0.6)',
+              },
+            ]}>
+          <View style={[styles.modal, {backgroundColor: scheme === 'dark' ?  '#222222' : '#efeeee'}]}>
+            <AppText style={styles.modalTitle}>Game Over</AppText>
+            <AppText style={styles.modalScore}>
               Your Score: {score}/{attempts} (
               {Math.round((score / attempts) * 100)})
-            </Text>
+            </AppText>
             <Button
               height={75}
               width={200}
               onPress={() => restart()}
               text={'Play Again'}
-              bgColor={'yellow'}
+              bgColor={'#59fa14'}
               fontSize={20}
               margin={5}
             />
@@ -233,7 +248,7 @@ const styles = StyleSheet.create({
   button: {
     height: 75,
     width: 150,
-    backgroundColor: 'green',
+    backgroundColor: '#59fa14',
     justifyContent: 'center',
     alignItems: 'center',
     margin: 10,

@@ -20,11 +20,12 @@ import InputLine from '../InputLine/InputLine';
 import Button from '../Button/Button';
 import {Data} from '../../types/types';
 import Picker from 'react-native-picker-select';
-import {doc, addDoc, collection, writeBatch, setDoc} from 'firebase/firestore';
-import {database} from '../../firebaseConfig';
+import {doc, addDoc, collection, writeBatch, setDoc, getFirestore} from 'firebase/firestore';
 import {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
 import {useAppSelector} from '../../redux/hooks';
 import {getAuth} from 'firebase/auth';
+import { useTheme } from '@react-navigation/native';
+import AppText from '../AppText/AppText';
 
 type Props = {
   albumID : undefined | string;
@@ -36,14 +37,14 @@ const AddWord = ({albumID, cancel}: Props) => {
   const [data, setData] = useState<Definition[]>([]);
   const [error, setError] = useState<string>('');
   const [def, setDef] = useState<number>(0);
-  const [album, setAlbum] = useState<number>(-2);
   const [notes, setNotes] = useState<string>('');
-  const [newAlbum, setNewAlbum] = useState<string>('');
   const auth = getAuth();
+  const database = getFirestore();
   const user = auth.currentUser;
   const albumList = useAppSelector((state) => state.albums);
   const dispatch = useDispatch();
   const api = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
+  const {colors} = useTheme();
   const getWord = async () => {
     setError('');
     setData([]);
@@ -69,7 +70,6 @@ const AddWord = ({albumID, cancel}: Props) => {
     setData([]);
     setError('');
     setDef(0);
-    setAlbum(0);
     setNotes('');
   };
   const submitWord = async () => {
@@ -104,21 +104,15 @@ const AddWord = ({albumID, cancel}: Props) => {
       );
     }
   };
-  
-
-  useEffect(() => {
-    if (newAlbum) {
-      const index = albumList.findIndex((x) => x.name === newAlbum);
-      if (index !== -1) {
-        setAlbum(index);
-        setNewAlbum('');
-      }
-    }
-  }, [albumList, newAlbum]);
+useEffect(()=>{
+  //anytime the word is changed, remove the definitions
+  setData([])
+  setDef(0)
+},[word])
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, {backgroundColor: colors.background}]}>
       <View>
-        <Text style={styles.title}>Add Word</Text>
+        <AppText style={styles.title}>Add Word</AppText>
       </View>
       <View style={styles.form}>
         <InputLine
@@ -126,11 +120,11 @@ const AddWord = ({albumID, cancel}: Props) => {
           value={word}
           showError={!!error}
           error={error}
-          onChange={setWord}
-          onSubmit={getWord}
+          onChangeText={(text)=>setWord(text)}
+          onSubmitEditing={getWord}
         />
 
-        <Text style={styles.label}>Select a definition</Text>
+        <AppText style={styles.label}>Select a definition</AppText>
         <Picker
           onValueChange={(value) => setDef(value)}
           items={data.map((x, i) => ({
@@ -191,11 +185,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
+
   },
   title: {
     fontSize: 25,
     fontWeight: 'bold',
-    marginTop: 5,
+    padding: 20
   },
   form: {
     width: '85%',
@@ -212,10 +207,11 @@ const styles = StyleSheet.create({
   button: {
     height: 75,
     width: 150,
-    backgroundColor: 'green',
+    backgroundColor: '#59fa14',
     justifyContent: 'center',
     alignItems: 'center',
     margin: 10,
+    borderRadius: 8
   },
 });
 const pickerSelectStyles = StyleSheet.create({
@@ -230,6 +226,7 @@ const pickerSelectStyles = StyleSheet.create({
     borderRadius: 4,
     color: 'black',
     paddingRight: 30, // to ensure the text is never behind the icon
+    backgroundColor: 'white'
   },
   inputAndroid: {
     fontSize: 20,
@@ -240,5 +237,6 @@ const pickerSelectStyles = StyleSheet.create({
     borderRadius: 8,
     color: 'black',
     paddingRight: 30, // to ensure the text is never behind the icon
+    backgroundColor: 'white'
   },
 });

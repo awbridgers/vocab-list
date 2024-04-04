@@ -1,40 +1,32 @@
-import React, { Dispatch, SetStateAction } from 'react';
-import { View, TextInput, Text, StyleSheet } from 'react-native';
-import {autoCompleteType, textContentType} from '../../types/types'
+import React, {Dispatch, SetStateAction} from 'react';
+import {View, TextInput, Text, StyleSheet, TextInputProps} from 'react-native';
+import {autoCompleteType, textContentType} from '../../types/types';
+import AppText from '../AppText/AppText';
 
-interface iProps {
-  label: string,
-  value: string
-  showError: boolean,
-  error: string,
-  style?: {
-    container? : {},
-    label? : {}
-
-  },
-  onChange: Dispatch<SetStateAction<string>>,
-  autocompleteType? : autoCompleteType,
-  textContentType? : textContentType,
-  secureTextEntry? : boolean
-  onSubmit?: ()=>any
+interface iProps extends TextInputProps {
+  label: string;
+  showError: boolean;
+  error: string;
 }
 
-const InputLine = ({onSubmit, value,label, showError,error,style,onChange,autocompleteType, textContentType, secureTextEntry}:iProps) => (
-  <View style={[defaultStyle.container]}>
-    <Text style={[defaultStyle.label]}>{label}</Text>
-    <TextInput
-      style={[defaultStyle.input]}
-      value={value}
-      onChangeText={(text)=>onChange(text)}
-      textContentType={textContentType}
-      autoComplete = {autocompleteType}
-      secureTextEntry = {secureTextEntry}
-      accessibilityLabel = {label}
-      onSubmitEditing = {onSubmit}
-    />
-    <Text style = {[defaultStyle.error]}>{showError && error}</Text>
-  </View>
-);
+const InputLine = ({
+  label,
+  showError,
+  error,
+  ...props
+}: iProps) => {
+  return (
+    <View style={[defaultStyle.container]}>
+      <AppText style={[defaultStyle.label]}>{label}</AppText>
+      <TextInput
+        style={[defaultStyle.input]}
+        accessibilityLabel={label}
+        {...props}
+      />
+      <Text style={[defaultStyle.error]}>{showError && error}</Text>
+    </View>
+  );
+};
 
 const defaultStyle = StyleSheet.create({
   container: {
@@ -47,15 +39,16 @@ const defaultStyle = StyleSheet.create({
     padding: 10,
     flexGrow: 1,
     fontSize: 20,
+    backgroundColor: 'white',
   },
   label: {
-    fontSize: 20,
+    fontSize: 22,
     margin: 5,
   },
-  error:{
+  error: {
     color: 'red',
-    minHeight: 15
-  }
-})
+    minHeight: 15,
+  },
+});
 
-export default InputLine
+export default InputLine;

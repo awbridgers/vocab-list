@@ -21,7 +21,7 @@ export interface Word {
   notes: string,
   antonyms: string[];
   synonyms: string[];
-  partOfSpeech: string[];
+  partOfSpeech: string;
   id: string;
   albums: string[];
 }

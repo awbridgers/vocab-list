@@ -1,15 +1,11 @@
-import {useEffect, useState} from 'react';
-import {View, Text, StyleSheet, TextInput, Alert} from 'react-native';
-import { database} from '../../firebaseConfig';
-import {changeUser} from '../../redux/userSlice';
+import {useState} from 'react';
+import {View, Text, StyleSheet, Alert, useColorScheme} from 'react-native';
 import {createUserWithEmailAndPassword, getAuth} from 'firebase/auth';
 import Button from '../Button/Button';
 import InputLine from '../InputLine/InputLine';
-import {doc, setDoc} from 'firebase/firestore';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamsList} from '../../types/types';
-import {useSelector, useDispatch} from 'react-redux';
-import {RootState} from '../../redux/store';
+import AppText from '../AppText/AppText';
 
 type createProps = NativeStackScreenProps<RootStackParamsList, 'Create'>;
 
@@ -19,6 +15,7 @@ const Create = ({navigation}: createProps) => {
   const [confirm, setConfirm] = useState<string>('');
   const [error, setError] = useState<string>('');
   const auth = getAuth();
+  const scheme = useColorScheme();
 
 
 
@@ -37,15 +34,15 @@ const Create = ({navigation}: createProps) => {
     }
   };
   return (
-    <View style={style.container}>
-      <Text style={style.title}>Create Account</Text>
+    <View style={[style.container, {backgroundColor: scheme === 'dark' ? 'black' : 'white'}]}>
+      <AppText style={style.title}>Create Account</AppText>
       <View style={style.form}>
         <InputLine
           label="Email"
           value={email}
           showError={error.includes('email')}
           error={error}
-          onChange={setEmail}
+          onChangeText={(text)=>setEmail(text)}
         />
 
         <InputLine
@@ -53,7 +50,7 @@ const Create = ({navigation}: createProps) => {
           value={password}
           showError={error.includes('password')}
           error={error}
-          onChange={setPassword}
+          onChangeText={(text)=>setPassword(text)}
           secureTextEntry
         />
         <InputLine
@@ -65,7 +62,7 @@ const Create = ({navigation}: createProps) => {
             (!error.includes('password') || error.includes('match'))
           }
           error={error}
-          onChange={setConfirm}
+          onChangeText={(text)=>setConfirm(text)}
           secureTextEntry
         />
       </View>
@@ -74,7 +71,7 @@ const Create = ({navigation}: createProps) => {
         height={75}
         width={200}
         text={'Sign Up'}
-        bgColor={'#5da2ca'}
+        bgColor={'#59fa14'}
         fontSize={30}
       />
     </View>
@@ -94,7 +91,6 @@ const style = StyleSheet.create({
   title: {
     fontSize: 25,
     fontWeight: 'bold',
-    color: 'black',
     textAlign: 'center',
     margin: 10,
   },
