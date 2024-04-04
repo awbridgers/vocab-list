@@ -37,8 +37,9 @@ const Quiz = ({navigation, route}: Props) => {
   const restart = () => {
     setGameOver(false);
     wordList.current = allWords;
-    setGameStarted(true);
-    setWord();
+    setGameStarted(false);
+    setScore(0);
+    setAttempts(0);
   };
   const setWord = () => {
     //pick a random word from the total list
@@ -80,7 +81,10 @@ const Quiz = ({navigation, route}: Props) => {
         setAttempts((prev) => (guessCount.current === 0 ? prev + 1 : prev));
         setClicked([]);
         if (wordList.current.length) setWord();
-        else setGameOver(true);
+        else {
+          setGameOver(true);
+          setGameStarted(false);
+        }
       }, 2000);
     } else {
       //wrong answer!
@@ -159,7 +163,7 @@ const Quiz = ({navigation, route}: Props) => {
       </View>
       <Modal
         accessibilityLabel="menu modal"
-        visible={gameStarted && gameOver}
+        visible={!gameStarted && gameOver}
         animationType="slide"
         transparent={true}
       >
@@ -182,7 +186,7 @@ const Quiz = ({navigation, route}: Props) => {
               height={75}
               width={200}
               onPress={() => restart()}
-              text={'Play Again'}
+              text={'Done'}
               bgColor={'#59fa14'}
               fontSize={20}
               margin={5}
